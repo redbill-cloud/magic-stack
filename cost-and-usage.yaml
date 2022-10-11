@@ -1,0 +1,135 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  CURBucket:
+    Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Delete
+    Properties:
+      LifecycleConfiguration:
+        Rules:
+          - Id: Expire
+            Status: Enabled
+            ExpirationInDays: 60
+      BucketName: !Sub 'magic-stack-cur-${AWS::AccountId}'
+  AWSBillingPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CURBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: '386209384616'
+            Action:
+              - s3:GetBucketAcl
+              - s3:GetBucketPolicy
+            Resource: !Sub 'arn:aws:s3:::magic-stack-cur-${AWS::AccountId}'
+          - Effect: Allow
+            Principal:
+              AWS: '386209384616'
+            Action: s3:PutObject
+            Resource: !Sub 'arn:aws:s3:::magic-stack-cur-${AWS::AccountId}/*'
+  CostReport:
+    Type: AWS::CUR::ReportDefinition
+    DependsOn:
+      - AWSBillingPolicy
+    Properties:
+      ReportName: 'magic-cur'
+      TimeUnit: HOURLY
+      S3Prefix: magicstack
+      Format: Parquet
+      Compression: Parquet
+      S3Bucket: !Ref CURBucket
+      S3Region: us-east-1
+      AdditionalSchemaElements:
+        - RESOURCES
+      AdditionalArtifacts:
+        - ATHENA
+      ReportVersioning: OVERWRITE_REPORT
+      RefreshClosedReports: true
+  MagicWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: 'MagicStackWorkGroup'
+      RecursiveDeleteOption: true
+      State: ENABLED
+      WorkGroupConfiguration:
+        PublishCloudWatchMetricsEnabled: false
+        ResultConfiguration:
+          OutputLocation: !Sub 's3://magic-stack-cur-${AWS::AccountId}/magicstack/query-results'
+  CURDatabase:
+    Type: 'AWS::Glue::Database'
+    Properties:
+      DatabaseInput:
+        Name: 'magic_stack'
+      CatalogId: !Ref AWS::AccountId
+  CURCrawlerRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - glue.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - !Sub 'arn:us-east-1:iam::aws:policy/service-role/AWSGlueServiceRole'
+      Policies:
+        - PolicyName: CURCrawlerPermissions
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: !Sub 'arn:${AWS::Partition}:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'glue:UpdateDatabase'
+                  - 'glue:UpdatePartition'
+                  - 'glue:CreateTable'
+                  - 'glue:UpdateTable'
+                  - 'glue:ImportCatalogToGlue'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                Resource: !Sub 'arn:aws:s3:::magic-stack-cur-${AWS::AccountId}/*'
+  AWSCURCrawler:
+    Type: 'AWS::Glue::Crawler'
+    Properties:
+      Name: 'MagicStackCrawler'
+      Role: !GetAtt CURCrawlerRole.Arn
+      DatabaseName: 'magic_stack'
+      Configuration: "{\"Version\":1.0,\"CrawlerOutput\":{\"Tables\":{\"AddOrUpdateBehavior\":\"MergeNewColumns\"}}}"
+      Targets:
+        S3Targets:
+          - Path: !Sub 's3://magic-stack-cur-${AWS::AccountId}/magicstack/magic-cur/magic-cur'
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: DELETE_FROM_DATABASE
+  CURStatus:
+    Type: 'AWS::Glue::Table'
+    DependsOn: CURDatabase
+    Properties:
+      DatabaseName: magic_stack
+      CatalogId: !Ref AWS::AccountId
+      TableInput:
+        Name: 'cost_and_usage_data_status'
+        TableType: 'EXTERNAL_TABLE'
+        StorageDescriptor:
+          Columns:
+            - Name: status
+              Type: 'string'
+          InputFormat: 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat'
+          OutputFormat: 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat'
+          SerdeInfo:
+            SerializationLibrary: 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe'
+          Location: !Sub 's3://magic-stack-cur-${AWS::AccountId}/magicstack/magic-cur/magic-cur/cost_and_usage_data_status/'

@@ -1,0 +1,289 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Magic Lambda
+Resources:
+  WranglerLayer38:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: AWSDataWrangler-Python38
+      Content:
+        S3Bucket: aws-data-wrangler-public-artifacts
+        S3Key: 'releases/2.17.0/awswrangler-layer-2.17.0-py3.8.zip'
+      CompatibleRuntimes:
+        - python3.8
+
+  CloudWatchTrigger:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Daily Check Trigger
+      Name: 'DailyRun'
+      ScheduleExpression: "cron(0 8 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt Lambda.Arn
+          Id: DailyMagic
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: 'MagicStackLambdaRole'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+      Path: /
+      Policies:
+        - PolicyName: "MagicLogs"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
+        - PolicyName: "AthenaAccessForMagicLambda"
+          PolicyDocument:
+            Statement:
+                - Action: 's3:*'
+                  Effect: "Allow"
+                  Resource:
+                    - !Sub 'arn:aws:s3:::magic-stack-cur-${AWS::AccountId}'
+                    - !Sub 'arn:aws:s3:::magic-stack-cur-${AWS::AccountId}/*'
+                - Action: 'athena:*'
+                  Effect: "Allow"
+                  Resource: '*'
+                - Action: 'glue:*'
+                  Effect: Allow
+                  Resource:
+                    - !Sub 'arn:aws:glue:us-east-1:${AWS::AccountId}:catalog'
+                    - !Sub 'arn:aws:glue:us-east-1:${AWS::AccountId}:database/magic_stack'
+                    - !Sub 'arn:aws:glue:us-east-1:${AWS::AccountId}:database/magic_stack/*'
+                    - !Sub 'arn:aws:glue:us-east-1:${AWS::AccountId}:table/magic_stack/*'
+                    - !Sub 'arn:aws:glue:us-east-1:${AWS::AccountId}:userDefinedFunction/magic_stack/*'
+                    - !Sub 'arn:aws:glue:us-east-1:${AWS::AccountId}:crawler/MagicStackCrawler'
+  Lambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: "MagicStackLambda"
+      Description: Yeah.
+      Runtime: python3.8
+      Code:
+        ZipFile: |
+          #!/usr/bin/env python3
+          import awswrangler as wr
+          import boto3,time,os,json
+
+          def lambda_handler(event, context):
+            run_glue()
+            hours, amortized = check_data()
+            if hours < 336:
+              print ('not enough data.. Rerunning tomorrow.')
+              return
+            analyze(amortized, zero(amortized), first(), second(), third())
+
+          def analyze(amortized, zero, first, second, third):
+            sum = zero + first + second + third
+            new_line = '\n'
+            signal(f"Report for {os.environ['AWS_ACCOUNT']}", f"""Report for AWS Account/Org AWS account {os.environ['AWS_ACCOUNT']}. {new_line}
+              Amortized: ${amortized} PA  {new_line}
+              Zero: ${zero}  {new_line}
+              First: ${first}  {new_line}
+              Second: ${second}  {new_line}
+              Third: ${third}  {new_line}
+              Total: ${sum}""", sum)
+
+          def zero(amortized):
+            query = """
+            with base as (SELECT sum(COALESCE(line_item_net_unblended_cost, line_item_unblended_cost)) as special,
+                                 sum(pricing_public_on_demand_cost)                                    as special_public
+                          FROM magic_stack.magic_cur
+                          WHERE date_trunc('day', line_item_usage_start_date) >= date_trunc('day', current_date - interval '15' day)
+                            and date_trunc('day', line_item_usage_start_date) < date_trunc('day', current_date - interval '1' day)
+                            and product_product_name = 'Amazon Elastic Compute Cloud'
+                            and line_item_product_code = 'AmazonEC2'
+                            and product_product_family in ('Storage', 'Storage Snapshot')
+            )
+            select round(100- special*100/special_public, 2) as special
+            from base;
+            """
+            special = wr.athena.read_sql_query(sql=query, database="magic_stack", workgroup='MagicStackWorkGroup')['special'].values[0]
+            if special < 1:
+              return round(0.05 * amortized)
+            else:
+              return 0
+
+          def first():
+            query = """
+            with base as (SELECT date_trunc('hour', line_item_usage_start_date)               hour,
+                               round(SUM( COALESCE(line_item_net_unblended_cost,line_item_unblended_cost)) * 24 * 365, 0) AS amortized_cost
+                       FROM magic_stack.magic_cur
+                       WHERE date_trunc('day', line_item_usage_start_date) >= date_trunc('day', current_date - interval '15' day)
+                            and date_trunc('day', line_item_usage_start_date) < date_trunc('day', current_date - interval '1' day)
+                           and product_product_name = 'Amazon Elastic Compute Cloud'
+                           and line_item_line_item_type = 'Usage'
+                           and product_product_family in ('Compute Instance')
+                           and line_item_usage_type like '%Box%'
+                       group by 1
+                           order by amortized_cost
+                       ),
+                       ranked as (select
+                              real_hour,
+                              row_number() over (order by coalesce (amortized_cost, 0)) rank,
+                              Round(coalesce (amortized_cost,0)) as cost
+                              from unnest(transform(sequence(1, 14*24, 1), t -> date_add('hour', -t, date_trunc('day', current_timestamp - interval '1' day) ))) as t(real_hour)
+                                  left join base on real_hour = hour)
+                       select round(cost * 0.15) as saving  from ranked where rank = 16;
+            """
+            return wr.athena.read_sql_query(sql=query, database="magic_stack", workgroup='MagicStackWorkGroup')['saving'].values[0];
+
+          def second():
+            query = """
+            with base as (SELECT line_item_usage_start_date hour,
+                                 round(SUM(COALESCE(line_item_net_unblended_cost, line_item_unblended_cost)) * 24 * 365,
+                                       0) AS amortized
+                          FROM magic_stack.magic_cur
+                          WHERE date_trunc('day', line_item_usage_start_date) >= date_trunc('day', current_date - interval '15' day)
+                            and date_trunc('day', line_item_usage_start_date) < date_trunc('day', current_date - interval '1' day)
+                            and product_product_name = 'Amazon Relational Database Service'
+                            and product_product_family = 'Database Instance'
+                            and line_item_line_item_type <> 'DiscountedUsage'
+                            and (product_database_engine <> 'SQL Server' or product_database_edition <> 'Enterprise')
+                          group by 1
+            ),
+                 ranked as (select real_hour,
+                                   row_number() over (order by coalesce (amortized, 0)) rank, Round(coalesce(amortized, 0)) as amortized
+                            from unnest(transform(sequence(1, 14 * 24, 1), t -> date_add('hour', -t, date_trunc('day', current_timestamp - interval '1' day)))) as t(real_hour)
+                                     left join base on real_hour = hour)
+            select round(amortized) * 0.3 as saving
+            from ranked
+            where rank = 16;
+            """
+            return wr.athena.read_sql_query(sql=query, database="magic_stack", workgroup='MagicStackWorkGroup')['saving'].values[0];
+
+          def third():
+            query = """
+            with base as (SELECT line_item_usage_start_date hour,
+                                 round(SUM(COALESCE(line_item_net_unblended_cost, line_item_unblended_cost)) * 24 * 365,
+                                       0) AS amortized
+                          FROM magic_stack.magic_cur
+                          WHERE date_trunc('day', line_item_usage_start_date) >= date_trunc('day', current_date - interval '15' day)
+                            and date_trunc('day', line_item_usage_start_date) < date_trunc('day', current_date - interval '1' day)
+                            and product_product_name = 'Amazon OpenSearch Service'
+                            and line_item_line_item_type = 'Usage'
+                            and product_product_family in ('Amazon OpenSearch Service Instance')
+                            and line_item_line_item_type <> 'DiscountedUsage'
+                          group by 1
+            ),
+                 ranked as (select real_hour,
+                                   row_number() over (order by coalesce (amortized, 0)) rank, Round(coalesce(amortized, 0)) as cost
+                            from unnest(transform(sequence(1, 14 * 24, 1), t -> date_add('hour', -t, date_trunc('day', current_timestamp - interval '1' day)))) as t(real_hour)
+                                     left join base on real_hour = hour)
+            select round(cost * 0.3) as saving
+            from ranked
+            where rank = 16;
+            """
+            return wr.athena.read_sql_query(sql=query, database="magic_stack", workgroup='MagicStackWorkGroup')['saving'].values[0];
+
+          def call_home(subject, message, attributes):
+            sns = boto3.client('sns')
+            sns.publish(
+              Message=json.dumps({'default': message}),
+              Subject=subject,
+              TargetArn='arn:aws:sns:us-east-1:803335938539:magic-stack-topic',
+              MessageStructure='json',
+              MessageAttributes=attributes
+            )
+
+          def notify(subject, message):
+            attributes = {
+              'message_type': {
+                  'DataType': 'String',
+                  'StringValue': 'notification'
+              }}
+            call_home(subject, message, attributes)
+
+
+          def signal(subject, message, magic_number):
+            attributes = {
+              'message_type': {
+                  'DataType': 'String',
+                  'StringValue': 'signal'
+              },
+              'magic_number': {
+                  'DataType': 'Number',
+                  'StringValue': str(magic_number)
+              }}
+            call_home(subject, message, attributes)
+
+          def check_data():
+            build_meta()
+            query = """
+                select count(distinct(line_item_usage_start_date)) hours,
+                   ROUND(SUM(
+                   CASE
+                      WHEN (line_item_line_item_type = 'SavingsPlanRecurringFee') THEN 0
+                      WHEN (line_item_line_item_type = 'RIFee') THEN 0
+                      WHEN (line_item_line_item_type = 'SavingsPlanNegation') THEN 0
+                      WHEN (line_item_line_item_type = 'SavingsPlanUpfrontFee') THEN 0
+                      WHEN ((line_item_line_item_type ='Fee') AND (reservation_reservation_a_r_n <> '')) THEN 0
+                      WHEN (line_item_line_item_type = 'DiscountedUsage') THEN COALESCE(reservation_net_effective_cost,reservation_effective_cost)
+                      WHEN (line_item_line_item_type = 'SavingsPlanCoveredUsage') THEN COALESCE(savings_plan_net_savings_plan_effective_cost,savings_plan_savings_plan_effective_cost)
+                      ELSE COALESCE(line_item_net_unblended_cost,line_item_unblended_cost) END)) amortized_cost
+                  from magic_stack.magic_cur;
+            """
+            res = wr.athena.read_sql_query(sql=query, database="magic_stack", workgroup='MagicStackWorkGroup')
+            hours, amortized = res.iloc[0]
+            notify(f"Daily Check for {os.environ['AWS_ACCOUNT']}", f"AWS account {os.environ['AWS_ACCOUNT']} Hours of data {hours}, amortized: {amortized}")
+            return hours, round(amortized / hours * 24 * 365)
+
+
+          def build_meta():
+            run('ALTER table magic_stack.magic_cur ADD COLUMNS  (line_item_net_unblended_cost double)')
+            run('ALTER table magic_stack.magic_cur ADD COLUMNS  (reservation_net_effective_cost double)')
+            run('ALTER table magic_stack.magic_cur ADD COLUMNS  (savings_plan_net_savings_plan_effective_cost double)')
+            run('ALTER table magic_stack.magic_cur ADD COLUMNS  (savings_plan_savings_plan_effective_cost double)')
+            run('ALTER table magic_stack.magic_cur ADD COLUMNS  (product_database_edition string)')
+            time.sleep(5)
+
+          def run(query):
+            client = boto3.client('athena')
+            client.start_query_execution(
+              QueryString=query,
+              QueryExecutionContext={
+                  'Database': 'magic_stack'
+              },
+              WorkGroup='MagicStackWorkGroup'
+            )
+
+          def run_glue():
+           glue = boto3.client('glue')
+           if glue.get_crawler(Name = 'MagicStackCrawler')['Crawler']['State'] != 'READY':
+             return
+           glue.start_crawler( Name = 'MagicStackCrawler')
+           time.sleep(10)
+           while glue.get_crawler(Name = 'MagicStackCrawler')['Crawler']['State'] == 'RUNNING':
+             time.sleep(5)
+
+      Handler: 'index.lambda_handler'
+      MemorySize: 777
+      Timeout: 900
+      Layers:
+        - !Ref WranglerLayer38
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          AWS_ACCOUNT: !Ref 'AWS::AccountId'
+  EventPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt Lambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt CloudWatchTrigger.Arn
