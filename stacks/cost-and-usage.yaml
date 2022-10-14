@@ -57,6 +57,10 @@ Resources:
         PublishCloudWatchMetricsEnabled: false
         ResultConfiguration:
           OutputLocation: !Sub 's3://magic-stack-cur-${AWS::AccountId}/magicstack/query-results'
+      Tags:
+        - Key: 'magic-stack'
+          Value: 'infra'
+
   CURDatabase:
     Type: 'AWS::Glue::Database'
     Properties:
@@ -115,6 +119,9 @@ Resources:
       SchemaChangePolicy:
         UpdateBehavior: UPDATE_IN_DATABASE
         DeleteBehavior: DELETE_FROM_DATABASE
+      Tags:
+        - Key: 'magic-stack'
+          Value: 'infra'
   CURStatus:
     Type: 'AWS::Glue::Table'
     DependsOn: CURDatabase

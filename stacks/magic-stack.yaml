@@ -1,6 +1,11 @@
 ---
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Magic Stack.
+Parameters:
+  Email:
+    Type: String
+    Description: Contact Email
+    AllowedPattern: '[^@]+@[^@]+\.[^@]+'
 Resources:
   CURStack:
     Type: AWS::CloudFormation::Stack
@@ -17,3 +22,6 @@ Resources:
       Tags:
         - Key: 'magic-stack'
           Value: 'infra'
+      Parameters:
+        - ParameterKey: Email
+          ParameterValue: !Ref Email

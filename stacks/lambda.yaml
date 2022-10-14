@@ -1,5 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Magic Lambda
+Parameters:
+  Email:
+    Type: String
+    Description: Contact Email
 Resources:
   WranglerLayer38:
     Type: AWS::Lambda::LayerVersion
@@ -71,7 +75,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: "MagicStackLambda"
-      Description: Yeah.
+      Description: Magic Stack Analysis.
       Runtime: python3.8
       Code:
         ZipFile: |
@@ -90,7 +94,7 @@ Resources:
           def analyze(amortized, zero, first, second, third):
             sum = zero + first + second + third
             new_line = '\n'
-            signal(f"Report for {os.environ['AWS_ACCOUNT']}", f"""Report for AWS Account/Org AWS account {os.environ['AWS_ACCOUNT']}. {new_line}
+            signal(f"Report for: {os.environ['Email']}, account: {os.environ['AWS_ACCOUNT']}", f"""Report for AWS Account/Org AWS account {os.environ['AWS_ACCOUNT']}. {new_line}
               Amortized: ${amortized} PA  {new_line}
               Zero: ${zero}  {new_line}
               First: ${first}  {new_line}
@@ -239,7 +243,7 @@ Resources:
             """
             res = wr.athena.read_sql_query(sql=query, database="magic_stack", workgroup='MagicStackWorkGroup')
             hours, amortized = res.iloc[0]
-            notify(f"Daily Check for {os.environ['AWS_ACCOUNT']}", f"AWS account {os.environ['AWS_ACCOUNT']} Hours of data {hours}, amortized: {amortized}")
+            notify(f"Daily Check for: {os.environ['Email']}, account: {os.environ['AWS_ACCOUNT']}", f"AWS account {os.environ['AWS_ACCOUNT']} Hours of data {hours}, amortized: {amortized}")
             return hours, round(amortized / hours * 24 * 365)
 
 
@@ -279,6 +283,7 @@ Resources:
       Environment:
         Variables:
           AWS_ACCOUNT: !Ref 'AWS::AccountId'
+          Email: !Ref Email
   EventPermission:
     Type: AWS::Lambda::Permission
     Properties:
