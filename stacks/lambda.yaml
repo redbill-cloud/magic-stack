@@ -117,7 +117,7 @@ Resources:
             from base;
             """
             special = wr.athena.read_sql_query(sql=query, database="magic_stack", workgroup='MagicStackWorkGroup')['special'].values[0]
-            if special < 1 && amortized > 2000000:
+            if special < 1 and amortized > 2000000:
               return round(0.05 * amortized)
             else:
               return 0
