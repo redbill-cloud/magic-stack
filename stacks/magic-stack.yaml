@@ -23,4 +23,5 @@ Resources:
         - Key: 'magic-stack'
           Value: 'infra'
       Parameters:
-        - Email: !Ref Email
+        - ParameterKey: ContactEmail
+          ParameterValue: !Ref Email
