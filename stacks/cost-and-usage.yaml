@@ -120,7 +120,7 @@ Resources:
         UpdateBehavior: UPDATE_IN_DATABASE
         DeleteBehavior: DELETE_FROM_DATABASE
       Tags:
-        - "magic-stack": "infra"
+        "magic-stack": "infra"
   CURStatus:
     Type: 'AWS::Glue::Table'
     DependsOn: CURDatabase
