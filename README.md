@@ -6,7 +6,7 @@ How does the Magic Stack *work*?
 You click a button, and a few days later, RedBill gets an email with the amount you can save across your entire AWS organization.
 We contact you and explain the exact actions you need to take to realize the savings. You can realize these recommendations within hours.
 
-[![Launch Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/create/review?templateURL=https://redbill-scanner.s3.amazonaws.com/magic-stack.yaml)
+[![Launch Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/create/review?templateURL=https://redbill-scanner.s3.amazonaws.com/magic-stack.yaml&stackName=RedbillMagicStack)
 
 The recommended actions are purely financial, meaning the fixing part is easy and:
 * No risk of downtime to your resources, applications and systems
