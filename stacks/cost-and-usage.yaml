@@ -81,7 +81,7 @@ Resources:
               - 'sts:AssumeRole'
       Path: /
       ManagedPolicyArns:
-        - !Sub 'arn:us-east-1:iam::aws:policy/service-role/AWSGlueServiceRole'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSGlueServiceRole'
       Policies:
         - PolicyName: CURCrawlerPermissions
           PolicyDocument:
