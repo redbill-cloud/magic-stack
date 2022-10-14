@@ -1,0 +1,19 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Magic Stack.
+Resources:
+  CURStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://redbill-scanner.s3.amazonaws.com/cost-and-usage.yaml
+      Tags:
+        - Key: 'magic-stack'
+          Value: 'infra'
+  LambdaStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: CURStack
+    Properties:
+      TemplateURL: https://redbill-scanner.s3.amazonaws.com/lambda.yaml
+      Tags:
+        - Key: 'magic-stack'
+          Value: 'infra'
