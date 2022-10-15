@@ -2,7 +2,7 @@
 
 ## What is Redbill Magic Stack?
 
-Redbill Magic Stack is a straightforward AWS Bill scanner that generates insights into areas where you can start **saving money immediately**. The Magic Stack scans your billing data and notifies the aggregate findings to Redbill. We then use these numbers to email a simple report on which you can act.
+Redbill Magic Stack is a straightforward AWS Bill scanner that generates insights into areas where you can start **saving money immediately**. The Magic Stack scans your billing data and notifies the aggregate findings to Redbill. We then use these numbers to email a simple, but actionable report.
 
 ## How does the Magic Stack *work*?
 
