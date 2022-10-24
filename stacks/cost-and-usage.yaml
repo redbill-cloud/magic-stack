@@ -179,7 +179,7 @@ Resources:
           def lambda_handler(event, context):
             try:
                 bucket = event['ResourceProperties']['BucketName']
-
+                print(bucket)
                 if event['RequestType'] == 'Delete':
                     s3 = boto3.resource('s3')
                     bucket = s3.Bucket(bucket)
@@ -197,5 +197,5 @@ Resources:
     Type: Custom::removeData
     Properties:
       ServiceToken: !GetAtt RemoveBucketDataLambda.Arn
-      BucketName: !Sub 'arn:aws:s3:::magic-stack-cur-${AWS::AccountId}'
+      BucketName: !Sub 'magic-stack-cur-${AWS::AccountId}'
     DependsOn: CURBucket
