@@ -45,7 +45,7 @@ Technology used:
 You can delete the stack at *any time* with no consequences.
 
 > **Note** \
-> This stack, due to AWS limitations, can be installed only on us-east-1, but scans all your assets across all your regions.
+> This stack, due to AWS limitations, can be installed only on us-east-1, but scans all your assets across all your accounts & regions.
 
 > **Warning** \
 > For organizations with hundreds of accounts and millions in spend and this stack will cost up to $5 per month on their AWS Bill.
