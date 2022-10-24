@@ -245,7 +245,9 @@ Resources:
                       WHEN (line_item_line_item_type = 'DiscountedUsage') THEN COALESCE(reservation_net_effective_cost,reservation_effective_cost)
                       WHEN (line_item_line_item_type = 'SavingsPlanCoveredUsage') THEN COALESCE(savings_plan_net_savings_plan_effective_cost,savings_plan_savings_plan_effective_cost)
                       ELSE COALESCE(line_item_net_unblended_cost,line_item_unblended_cost) END)) amortized_cost
-                  from magic_stack.magic_cur;
+                  from magic_stack.magic_cur
+                WHERE date_trunc('day', line_item_usage_start_date) >= date_trunc('day', current_date - interval '15' day)
+                            and date_trunc('day', line_item_usage_start_date) < date_trunc('day', current_date - interval '1' day);
             """
             res = wr.athena.read_sql_query(sql=query, database="magic_stack", workgroup='MagicStackWorkGroup')
             hours, amortized = res.iloc[0]
