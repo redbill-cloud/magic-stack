@@ -71,6 +71,12 @@ Resources:
                     - !Sub 'arn:aws:glue:us-east-1:${AWS::AccountId}:table/magic_stack/*'
                     - !Sub 'arn:aws:glue:us-east-1:${AWS::AccountId}:userDefinedFunction/magic_stack/*'
                     - !Sub 'arn:aws:glue:us-east-1:${AWS::AccountId}:crawler/MagicStackCrawler'
+        - PolicyName: "SNSPublishMagicStack"
+          PolicyDocument:
+            Statement:
+              - Action: 'sns:Publish'
+                Effect: Allow
+                Resource: 'arn:aws:sns:us-east-1:803335938539:magic-stack-topic'
   Lambda:
     Type: AWS::Lambda::Function
     Properties:
