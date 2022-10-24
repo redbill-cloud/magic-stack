@@ -248,6 +248,7 @@ Resources:
 
 
           def build_meta():
+            run('ALTER table magic_stack.magic_cur ADD COLUMNS  (reservation_reservation_a_r_n string)')
             run('ALTER table magic_stack.magic_cur ADD COLUMNS  (line_item_net_unblended_cost double)')
             run('ALTER table magic_stack.magic_cur ADD COLUMNS  (reservation_net_effective_cost double)')
             run('ALTER table magic_stack.magic_cur ADD COLUMNS  (savings_plan_net_savings_plan_effective_cost double)')

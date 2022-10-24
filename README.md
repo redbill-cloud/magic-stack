@@ -15,8 +15,8 @@ The recommended actions are purely financial, meaning the fixing part is easy an
 * The stack does not require and Trusted connections, a simple AWS SNS message is sent with a short savings report.
 * This analysis is free - even the largest enterprise Organizations would spend a few USD.
 
-> **Warning** \
-> Make sure to have the following things checked **before** installing the stack
+> **Warning** [\
+>]() Make sure to have the following things checked **before** installing the stack
 > * You are logged in into your management account (master payer) (*Recommended*)
 > * You have place to create another bucket, check this by accessing [S3 bucket quota](https://us-east-1.console.aws.amazon.com/servicequotas/home/services/s3/quotas/) (*Required*)
 > * You have [less than 10 Cost and Usage reports](https://us-east-1.console.aws.amazon.com/billing/home?region=us-east-1#/reports) within that account (*Required*)
