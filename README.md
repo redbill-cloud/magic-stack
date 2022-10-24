@@ -1,7 +1,10 @@
 # Redbill Scanner - Magic Stack
 
+## What is Redbill Magic Stack?
 
-How does the Magic Stack *work*?
+Redbill Magic Stack is a straightforward AWS Bill scanner that generates insights into areas where you can start **saving money immediately**. The Magic Stack scans your billing data and notifies the aggregate findings to Redbill. We then use these numbers to email a simple, but actionable report.
+
+## How does the Magic Stack *work*?
 
 You click a button (**Launch Stack Below**), and a few days later, RedBill gets an email with the amount you can save across your entire AWS organization.
 We contact you and explain the exact actions you need to take to realize the savings. You can realize these recommendations within hours.
@@ -30,6 +33,13 @@ We are sure there are easy savings to be made before we even contact you.
 
 All the code is in the stack - so you can read all the code that executes on your account.  It's published as open source in this repository and uploaded to an s3 bucket, from where AWS Cloudfromation can reach it.
 
+Technology used:
+
+* AWS CloudFormation - to orchestrate the solution
+* AWS S3 to hold the billing data in *your account*
+* AWS Athena and AWS Glue to analyze your bill
+* AWS Lambda to generate the analysis and run the finders
+* AWS Wrangler - to keep the lambda code short
 
 
 You can delete the stack at *any time* with no consequences.
