@@ -1,0 +1,26 @@
+name: Deploy Prod
+on:
+  push:
+    tags-ignore:
+      - '**'
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy-prod:
+    name: Deploy Prod
+    runs-on: ubuntu-latest
+    concurrency:
+      group: 'prod'
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_PROD_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_PROD_SECRET_KEY }}
+          aws-region: us-east-1
+      - name: Deploy the cloudformation templates to the s3 bucket
+        run: aws s3 sync ./stacks/ s3://redbill-scanner/
